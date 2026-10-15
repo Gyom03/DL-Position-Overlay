@@ -1,6 +1,6 @@
 ﻿# Prépare une release autonome : uniquement nos binaires et des métadonnées d'identification.
 $ErrorActionPreference = 'Stop'
-$version = '1.0.3'
+$version = '1.0.4'
 $destination = Join-Path $PSScriptRoot "out\DLPositionOverlay_$version"
 New-Item -ItemType Directory -Force -Path $destination | Out-Null
 Copy-Item -LiteralPath (Join-Path $PSScriptRoot 'out\build\position.dll'), (Join-Path $PSScriptRoot 'out\build\winmm.dll'),

@@ -1,17 +1,35 @@
 ﻿# Exécute le rendu WARP et, si demandé, les tests de capture sur les DLL de l'utilisateur.
-param([string] $GameDir,
+param([string] $GameDir, [string] $NativeFilesystemDir,
     [string] $VcVars = "${env:ProgramFiles(x86)}\Microsoft Visual Studio\2022\BuildTools\VC\Auxiliary\Build\vcvarsall.bat")
 $ErrorActionPreference = 'Stop'
 $root = Split-Path $PSScriptRoot -Parent
 $destination = Join-Path $root 'out\tests'
 New-Item -ItemType Directory -Force -Path $destination | Out-Null
-foreach ($name in 'position_dxgi', 'position_capture_host') {
+foreach ($name in 'position_dxgi', 'position_capture_host', 'position_custom_paks', 'position_custom_paks_native') {
     $source = Join-Path $PSScriptRoot "mod_install\$name.cpp"
     cmd /c "`"$VcVars`" x64 -vcvars_ver=14.16 >nul 2>nul && cd /d `"$destination`" && cl /nologo /O2 /MT /std:c++17 /EHsc /W4 /utf-8 `"$source`" /Fe:$name.exe /link user32.lib gdi32.lib d3d11.lib dxgi.lib d3dcompiler.lib"
     if ($LASTEXITCODE -ne 0) { throw "Test build failed: $name" }
 }
 & (Join-Path $destination 'position_dxgi.exe')
 if ($LASTEXITCODE -ne 0) { throw 'DirectX pixel test failed.' }
+& (Join-Path $destination 'position_custom_paks.exe')
+if ($LASTEXITCODE -ne 0) { throw 'CustomPaks behavior tests failed.' }
+if ($NativeFilesystemDir) {
+    $nativeFixture = Join-Path $destination 'native-pak-fixture'
+    New-Item -ItemType Directory -Force -Path (Join-Path $nativeFixture 'CustomPaks') | Out-Null
+    Add-Type -AssemblyName System.IO.Compression
+    $archive = [IO.Compression.ZipArchive]::new([IO.File]::Create((Join-Path $nativeFixture 'CustomPaks\probe.pak')), [IO.Compression.ZipArchiveMode]::Create)
+    try {
+        $entry = $archive.CreateEntry('position_native_probe.txt')
+        $writer = [IO.StreamWriter]::new($entry.Open())
+        try { $writer.Write('Synthetic coordinate mod filesystem probe') } finally { $writer.Dispose() }
+    } finally { $archive.Dispose() }
+    Push-Location $destination
+    try {
+        & (Join-Path $destination 'position_custom_paks_native.exe') (Join-Path $NativeFilesystemDir 'filesystem_x64_rwdi.dll') $nativeFixture
+        if ($LASTEXITCODE -ne 0) { throw 'Native filesystem pack mounting test failed.' }
+    } finally { Pop-Location }
+}
 $loaderTest = Join-Path $destination 'loader'
 New-Item -ItemType Directory -Force -Path $loaderTest | Out-Null
 $loaderHost = Join-Path $PSScriptRoot 'loader_host.cpp'
@@ -27,6 +45,8 @@ for ($i=0; $i -lt 10; $i++) {
 if ($GameDir) {
     $game = Join-Path $GameDir 'gamedll_x64_rwdi.dll'
     $engine = Join-Path $GameDir 'engine_x64_rwdi.dll'
+    & (Join-Path $destination 'position_custom_paks.exe') $engine (Join-Path $GameDir 'filesystem_x64_rwdi.dll')
+    if ($LASTEXITCODE -ne 0) { throw 'CustomPaks verified hook tests failed.' }
     $hostExe = Join-Path $destination 'position_capture_host.exe'
     & $hostExe $game $engine
     if ($LASTEXITCODE -ne 0) { throw 'Coordinate sampling tests failed.' }
@@ -35,6 +55,6 @@ if ($GameDir) {
         if ($LASTEXITCODE -ne 0) { throw "DLL loading test failed: $mode" }
     }
     & (Join-Path $root 'package.ps1')
-    $package = Join-Path $root 'out\DLPositionOverlay_1.0.3'
+    $package = Join-Path $root 'out\DLPositionOverlay_1.0.4'
     & (Join-Path $PSScriptRoot 'mod_install\position_install.ps1') -GameDir $GameDir -InstallerPath (Join-Path $package 'install.ps1') -PackageDir $package
 } else { Write-Host 'Game-independent tests passed. Supply -GameDir to also test coordinate sampling and installation in a temporary folder.' }

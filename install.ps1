@@ -41,7 +41,7 @@ $loader = Join-Path $GameDir 'winmm.dll'
 $addLoader = $false
 if (!$Uninstall) {
     $manifest = Get-Content -LiteralPath (Join-Path $package 'version155.json') -Raw | ConvertFrom-Json
-    foreach ($name in 'gamedll_x64_rwdi.dll', 'engine_x64_rwdi.dll') {
+    foreach ($name in 'gamedll_x64_rwdi.dll', 'engine_x64_rwdi.dll', 'filesystem_x64_rwdi.dll') {
         $actual = (Get-FileHash -LiteralPath (Join-Path $GameDir $name) -Algorithm SHA256).Hash
         if ($actual -ne $manifest.$name) { throw "$name is not the supported Steam 1.55 build. No changes made." }
     }
@@ -74,6 +74,7 @@ $stamp = Get-Date -Format 'yyyyMMdd_HHmmss_fff'
 if ($exists) { Copy-Item -LiteralPath $config -Destination (Join-Path $backup "dlmods_$stamp.ini") }
 if (Test-Path -LiteralPath $dll) { Copy-Item -LiteralPath $dll -Destination (Join-Path $backup "position_$stamp.dll") }
 if (!$Uninstall) {
+    New-Item -ItemType Directory -Path (Join-Path $GameDir 'CustomPaks') -Force | Out-Null
     if ($addLoader) { Copy-Item -LiteralPath (Join-Path $package 'winmm.dll') -Destination $loader }
     Copy-Item -LiteralPath (Join-Path $package 'position.dll') -Destination $dll -Force
 }
@@ -84,5 +85,5 @@ if ($Uninstall -and (Test-Path -LiteralPath (Join-Path $GameDir 'position_1.0.1.
     Remove-Item -LiteralPath (Join-Path $GameDir 'position_1.0.1.dll')
 }
 Write-Host $(if ($Uninstall) { 'Position overlay uninstalled. The shared loader and other mods have been kept.' }
-    else { 'Position overlay installed. Start Dying Light normally. F8 shows or hides the coordinates.' })
+    else { 'Position overlay installed. Put .pak files in CustomPaks and start Dying Light normally. F8 shows or hides the coordinates.' })
 Write-Host $line

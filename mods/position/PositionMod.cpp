@@ -250,10 +250,12 @@ bool Install()
     VirtualProtect(renderSlot, sizeof(void*), renderOld, &ignored);
     if (previous != expectedUpdate || previousRender != expectedRender) return false;
     if (!restored) Log("Could not restore the virtual table memory protection");
-    Log("Installed v1.0.3: camera sampling and DirectX Present overlay; F8 toggles visibility");
+    Log("Installed v1.0.4: camera sampling and DirectX Present overlay; F8 toggles visibility");
     return true;
 }
 } // namespace position
+
+#include "CustomPaksLoader.h"
 
 #ifndef POSITION_TEST
 BOOL WINAPI DllMain(HINSTANCE module, DWORD reason, LPVOID)
@@ -270,6 +272,8 @@ BOOL WINAPI DllMain(HINSTANCE module, DWORD reason, LPVOID)
     HMODULE pinned = nullptr;
     GetModuleHandleExW(GET_MODULE_HANDLE_EX_FLAG_FROM_ADDRESS | GET_MODULE_HANDLE_EX_FLAG_PIN,
                       reinterpret_cast<LPCWSTR>(&position::ModUpdate), &pinned);
+    position::custompaks::Install(position::g_engine,
+        reinterpret_cast<uint8_t*>(GetModuleHandleW(L"filesystem_x64_rwdi.dll")));
     return TRUE;
 }
 #endif

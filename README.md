@@ -8,6 +8,7 @@ coordinates and the active camera's world coordinates in the top-left corner.
 - X, Y and Z use the game's world axes, with three decimal places. Missing values display `--`.
 - All overlay text, installer messages and runtime logs are in English.
 - Draws through Direct3D 11 at frame presentation. No launcher, network connection or account required.
+- Loads custom `.pak` archives from `CustomPaks`, using the same startup stage and flags as DLML.
 
 ## Install
 
@@ -56,11 +57,31 @@ This removes the overlay DLL and its configuration entry. The shared loader and 
 Backups and logs are also kept; you may remove them manually. For a manual uninstall, remove
 `position.dll` and only its entry from `Mods=`.
 
+## Custom packs
+
+Put your `.pak` files in **`CustomPaks` next to `DyingLightGame.exe`**, then restart the game.
+The installer creates this folder if needed. Existing archives are never changed or removed,
+including when uninstalling the overlay. Pack loading is independent of the F8 visibility toggle.
+
+At startup, the mod scans this folder (no subfolders), accepts `.pak` extensions regardless of case,
+and mounts them in alphabetical filename order before the game initializes its scripts. It calls
+the game's `fs::add_source` with flags `9`, as DLML does. These flags and this startup stage match
+DLML; alphabetical ordering makes the scan reproducible. Conflicting packs still need compatible
+contents; the overlay does not merge them. A failed archive is logged and does not stop other packs.
+
+An archive already mounted by this mod is skipped. If DLML or another loader has
+already hooked script initialization, the overlay leaves that hook intact and delegates pack loading
+to it; see `position.log`. Use a single custom-pack loader where possible. This feature works with the
+included loader and the recognized DLCoop loader, because it lives in `position.dll`.
+If a loader chains into this hook later during startup, our hook delegates pack loading to it as well.
+
 ## Troubleshooting
 
 - Only the verified **Steam 1.55** binaries are supported; other versions are rejected.
 - Check `position.log` next to the installed DLL. It records initialization, the first coordinate
-  sample, the first DirectX draw and F8 visibility changes.
+  sample, the first DirectX draw, F8 visibility changes and CustomPaks mount results.
+- If a custom pack has no effect, check the `CustomPaks:` lines in `position.log`. Loading happens
+  before game scripts; installing/injecting the DLL into an already-running game cannot reload packs.
 - If the overlay does not appear, verify that `Mods=` still contains `position.dll` and that the full
   release was extracted. Compatibility with other graphics overlays is not exhaustively tested.
 - The mod uses Windows' Direct3D 11 and shader compiler. It is intended for Windows 10/11 x64.
@@ -74,6 +95,7 @@ The C++ runtime is linked statically. Building does **not** require any game bin
 .\build.ps1
 .\tests\run.ps1                         # Real Direct3D WARP pixel test; no game needed
 .\tests\run.ps1 -GameDir '<game folder>' # Also tests read-only copies of the supported DLLs
+.\tests\run.ps1 -GameDir '<game folder>' -NativeFilesystemDir '<game folder>'
 .\package.ps1
 ```
 
@@ -89,6 +111,16 @@ The DirectX overlay and F8 toggle were confirmed working in a game session. Auto
 coordinate sampling, missing/invalid data, version rejection, toggling, real rendered text pixels,
 hidden-panel pixels and restoration of selected graphics states. Resolution changes and combinations
 with other graphics mods have not been exhaustively tested.
+
+CustomPaks checks cover folder creation, filtering, ordering, flags, duplicates, mount failures,
+preservation of both original initialization arguments, existing-hook rejection, and execution of
+the patched export in read-only-mapped game copies with synthetic filesystem callbacks.
+The optional native test loads the supported filesystem DLL and its dependencies from your game
+folder, initializes it with a temporary root, and mounts a synthetic ZIP. It checks that the ZIP's
+virtual file appears only after mounting and that a second pass skips the archive. It does not start
+the game or modify its installation. These tests do not establish that every third-party pack is
+compatible. The new CustomPaks feature
+still needs confirmation in a restarted game session with your packs.
 
 This is an unofficial mod. Dying Light belongs to Techland. No game binaries, game assets, game saves
 or proprietary decompilation exports are included in this repository or its releases.
