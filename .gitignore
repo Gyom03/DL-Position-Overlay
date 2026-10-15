@@ -1,0 +1,11 @@
+/out/
+/bin/
+*.dll
+*.exe
+*.obj
+*.pdb
+*.lib
+*.exp
+*.zip
+*.log
+/position_backup/
